@@ -16,7 +16,10 @@ import { AppError } from "./utils/error";
 
 const app = fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
-app.register(cors);
+app.register(cors, {
+    origin: "http://localhost:3000",
+    credentials: true,
+});
 app.register(helmet);
 app.register(dbPlugin);
 
