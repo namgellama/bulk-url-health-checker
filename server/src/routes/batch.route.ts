@@ -13,6 +13,16 @@ const batchRoutes = async (
     app: FastifyInstance,
     _opts: FastifyPluginOptions,
 ) => {
+    app.get("/", async (_req: FastifyRequest, reply: FastifyReply) => {
+        const batches = await app.prisma.batch.findMany();
+
+        return reply.send({
+            success: true,
+            message: "All batches fetched successfully",
+            data: batches,
+        });
+    });
+
     app.post(
         "/",
         { schema: { body: createBatchSchema } },
