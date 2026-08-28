@@ -1,76 +1,23 @@
-import type {
-    FastifyInstance,
-    FastifyPluginOptions,
-    FastifyRequest,
-    FastifyReply,
-} from "fastify";
-import {
-    createBatchSchema,
-    type CreateBatchInput,
-} from "../validations/batch.validation";
+import type { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { batchController } from "../controllers/batch.controller";
+import { batchRepository } from "../repositories/batch.repository";
+import { batchService } from "../services/batch.service";
+import { createBatchSchema } from "../validations/batch.validation";
 
 const batchRoutes = async (
     app: FastifyInstance,
     _opts: FastifyPluginOptions,
 ) => {
-    app.get("/", async (_req: FastifyRequest, reply: FastifyReply) => {
-        const batches = await app.prisma.batch.findMany();
+    const repository = batchRepository(app.prisma);
+    const service = batchService(repository);
+    const controller = batchController(service);
 
-        return reply.send({
-            success: true,
-            message: "All batches fetched successfully",
-            data: batches,
-        });
-    });
-
-    app.get(
-        "/:id",
-        async (
-            req: FastifyRequest<{ Params: { id: string } }>,
-            reply: FastifyReply,
-        ) => {
-            const batch = await app.prisma.batch.findUnique({
-                where: { id: req.params.id },
-                include: { urls: true },
-            });
-
-            if (!batch)
-                return reply.status(404).send({ message: "Batch not found" });
-
-            return reply.send({
-                success: true,
-                message: "Batch fetched successfully",
-                data: batch,
-            });
-        },
-    );
-
+    app.get("/", controller.getAllBatches);
+    app.get("/:id", controller.getBatch);
     app.post(
         "/",
         { schema: { body: createBatchSchema } },
-        async (req: FastifyRequest, reply: FastifyReply) => {
-            const body = req.body as CreateBatchInput;
-
-            const batch = await app.prisma.batch.create({
-                data: {
-                    totalCount: body.urls.length,
-                    urls: {
-                        createMany: {
-                            data: body.urls.map((url) => ({ url })),
-                        },
-                    },
-                },
-                include: {
-                    urls: true,
-                },
-            });
-
-            return reply.status(201).send({
-                success: true,
-                message: "Batch created successfully",
-                data: batch,
-            });
-        },
+        controller.createBatch,
     );
 };
 
