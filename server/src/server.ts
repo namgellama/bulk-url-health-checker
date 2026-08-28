@@ -1,8 +1,9 @@
 import app from "./app";
+import Env from "./utils/env";
 
 const start = async () => {
     try {
-        const PORT = 8000;
+        const PORT = Env.PORT;
 
         await app.listen({ port: PORT });
         console.log(`Server running on port ${PORT}`);
