@@ -57,3 +57,5 @@ Thumbs.db
 uploads/
 
 server/.env
+
+server/src/generated
