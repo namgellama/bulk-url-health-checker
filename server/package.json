@@ -4,12 +4,14 @@
     "main": "index.js",
     "type": "module",
     "scripts": {
-        "dev": "npx tsx src/index.ts"
+        "dev": "npx tsx src/server.ts"
     },
     "author": "",
     "license": "ISC",
     "description": "",
     "dependencies": {
+        "@fastify/cors": "^11.3.0",
+        "@fastify/helmet": "^13.1.1",
         "@prisma/adapter-pg": "^7.10.0",
         "@prisma/client": "^7.10.0",
         "dotenv": "^17.4.2",
