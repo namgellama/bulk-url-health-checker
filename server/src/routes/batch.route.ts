@@ -23,6 +23,28 @@ const batchRoutes = async (
         });
     });
 
+    app.get(
+        "/:id",
+        async (
+            req: FastifyRequest<{ Params: { id: string } }>,
+            reply: FastifyReply,
+        ) => {
+            const batch = await app.prisma.batch.findUnique({
+                where: { id: req.params.id },
+                include: { urls: true },
+            });
+
+            if (!batch)
+                return reply.status(404).send({ message: "Batch not found" });
+
+            return reply.send({
+                success: true,
+                message: "Batch fetched successfully",
+                data: batch,
+            });
+        },
+    );
+
     app.post(
         "/",
         { schema: { body: createBatchSchema } },
