@@ -11,3 +11,58 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum BatchStatus {
+  pending
+  running
+  completed
+  cancelled
+}
+
+enum UrlStatus {
+  queued
+  checking
+  success
+  failed
+  cancelled
+}
+
+model Batch {
+  id             String      @id @default(uuid())
+  status         BatchStatus @default(pending)
+  totalCount     Int         @default(0) @map("total_count")
+  completedCount Int         @default(0) @map("completed_count")
+  successCount   Int         @default(0) @map("success_count")
+  failedCount    Int         @default(0) @map("failed_count")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  urls Url[]
+
+  @@map("batches")
+}
+
+model Url {
+  id             String    @id @default(uuid())
+  url            String
+  status         UrlStatus @default(queued)
+  attemptCount   Int       @default(0) @map("attempt_count")
+  maxAttempts    Int       @default(3) @map("max_attempts")
+  httpStatus     Int?      @map("http_status")
+  responseTimeMs Int?      @map("response_time_ms")
+  pageTitle      String?   @map("page_title")
+  errorMessage   String?   @map("error_message")
+  jobId          String?   @map("job_id")
+  jobVersion     Int       @default(1) @map("job_version")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  startedAt      DateTime? @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+
+  batchId String @map("batch_id")
+  batch   Batch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([batchId, status])
+  @@map("urls")
+}
