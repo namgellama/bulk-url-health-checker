@@ -11,6 +11,7 @@ import {
     validatorCompiler,
 } from "fastify-type-provider-zod";
 import dbPlugin from "./plugins/db.plugin";
+import batchRoutes from "./routes/batch.route";
 
 const app = fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
@@ -23,6 +24,10 @@ app.setSerializerCompiler(serializerCompiler);
 
 app.get("/health", async (_request, _reply) => {
     return { status: "ok" };
+});
+
+app.register(batchRoutes, {
+    prefix: "/api/v1/batches",
 });
 
 app.setErrorHandler(
