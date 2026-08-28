@@ -1,10 +1,11 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { subscribeClientToBatch } from "../pub-sub/subscriber";
 import type { BatchService } from "../services/batch.service";
 import type { CreateBatchInput } from "../validations/batch.validation";
 
 export function batchController(batchService: BatchService) {
     return {
-        getAllBatches: async (req: FastifyRequest, reply: FastifyReply) => {
+        getAllBatches: async (_req: FastifyRequest, reply: FastifyReply) => {
             const batches = await batchService.getAll();
 
             return reply.send({
@@ -37,6 +38,35 @@ export function batchController(batchService: BatchService) {
                 success: true,
                 message: "Batch created successfully",
                 data: batch,
+            });
+        },
+
+        getBatchEvents: (
+            req: FastifyRequest<{ Params: { id: string } }>,
+            reply: FastifyReply,
+        ) => {
+            const res = reply.raw;
+
+            reply.hijack();
+
+            res.writeHead(200, {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache, no-transform",
+                Connection: "keep-alive",
+                "X-Accel-Buffering": "no",
+            });
+
+            res.write(": connected\n\n");
+
+            const unsubscribe = subscribeClientToBatch(req.params.id, res);
+
+            const heartbeat = setInterval(() => {
+                res.write(": heartbeat\n\n");
+            }, 15_000);
+
+            req.raw.on("close", () => {
+                clearInterval(heartbeat);
+                unsubscribe();
             });
         },
     };

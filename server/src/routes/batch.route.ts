@@ -21,6 +21,7 @@ const batchRoutes = async (
         { schema: { body: createBatchSchema } },
         controller.createBatch,
     );
+    app.get("/:id/events", controller.getBatchEvents);
 };
 
 export default batchRoutes;
