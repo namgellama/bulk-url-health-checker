@@ -10,11 +10,13 @@ import {
     serializerCompiler,
     validatorCompiler,
 } from "fastify-type-provider-zod";
+import dbPlugin from "./plugins/db.plugin";
 
 const app = fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
 app.register(cors);
 app.register(helmet);
+app.register(dbPlugin);
 
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
