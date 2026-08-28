@@ -2,6 +2,7 @@ import { Job, Worker } from "bullmq";
 import { redis } from "../utils/redis";
 import { prisma } from "../utils/prisma";
 import { checkUrl } from "../utils/url-checker";
+import { publishBatchEvent } from "../pub-sub/publisher";
 
 const worker = new Worker("url-queue", processUrl, {
     connection: redis,
@@ -108,6 +109,13 @@ async function writeResult(
     });
 
     if (outcome) {
-        console.log("🚀 ~ writeResult ~ outcome:", outcome);
+        await publishBatchEvent(batchId, {
+            type: "url_updated",
+            urlId,
+            status,
+            httpStatus: result.httpStatus,
+            responseTimeMs: result.responseTimeMs,
+            pageTitle: result.pageTitle,
+        });
     }
 }
