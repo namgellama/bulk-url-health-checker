@@ -11,6 +11,8 @@ import {
     validatorCompiler,
 } from "fastify-type-provider-zod";
 import dbPlugin from "./plugins/db.plugin";
+import batchRoutes from "./routes/batch.route";
+import { AppError } from "./utils/error";
 
 const app = fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
@@ -25,6 +27,10 @@ app.get("/health", async (_request, _reply) => {
     return { status: "ok" };
 });
 
+app.register(batchRoutes, {
+    prefix: "/api/v1/batches",
+});
+
 app.setErrorHandler(
     (error: FastifyError, _request: FastifyRequest, reply: FastifyReply) => {
         if (error.validation) {
@@ -34,10 +40,10 @@ app.setErrorHandler(
             });
         }
 
-        if (error.statusCode) {
+        if (error instanceof AppError) {
             return reply
                 .status(error.statusCode)
-                .send({ error: error.name, message: error.message });
+                .send({ name: error.name, message: error.message });
         }
 
         return reply.status(500).send({ error: "Internal Server Error" });
