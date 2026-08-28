@@ -6,7 +6,6 @@ export interface CheckResult {
 }
 
 const TIMEOUT_MS = 10_000;
-const MAX_HTML_BYTES = 100_000;
 
 export async function checkUrl(url: string): Promise<CheckResult> {
     const start = Date.now();
