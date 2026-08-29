@@ -2,7 +2,9 @@ import { api } from "@/lib/api";
 import { ApiError } from "@/types/api-error";
 import { Batch } from "@/types/batch";
 import { Url } from "@/types/url";
-import { useQuery } from "@tanstack/react-query";
+import { handleErrorResponse } from "@/utils/handleErrorResponse";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
 export const useFetchAllBatches = () => {
     const fetchAllBatches = async () => {
@@ -39,4 +41,29 @@ export const useFetchBatch = (id: string | undefined) => {
     });
 
     return { batch, isLoading, error };
+};
+
+export const useCreateBatch = () => {
+    const router = useRouter();
+
+    const fetchBatch = async (data: { urls: string[] }) => {
+        const response = await api.post(`/v1/batches`, data);
+        return response.data.data;
+    };
+
+    const { mutate: createBatchMutation, isPending: isLoading } = useMutation<
+        Batch,
+        ApiError,
+        { urls: string[] }
+    >({
+        mutationFn: fetchBatch,
+        onSuccess: (batch) => {
+            router.push(`/batches/${batch.id}`);
+        },
+        onError: (error) => {
+            handleErrorResponse(error, "Error creating batch");
+        },
+    });
+
+    return { createBatchMutation, isLoading };
 };
