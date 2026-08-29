@@ -1,26 +1,8 @@
-import { Batch } from "@/apis/batch.api";
-import { formatDate } from "@/utils/format-date";
+import { batchStatusConfig } from "@/app/constants/batchStatusConfig";
+import { Batch } from "@/types/batch";
+import { formatDate } from "@/utils/formatDate";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-
-const statusConfig = {
-    pending: {
-        label: "Pending",
-        className: "bg-yellow-100 text-yellow-700",
-    },
-    running: {
-        label: "Running",
-        className: "bg-blue-100 text-blue-700",
-    },
-    completed: {
-        label: "Completed",
-        className: "bg-green-100 text-green-700",
-    },
-    cancelled: {
-        label: "Cancelled",
-        className: "bg-gray-100 text-gray-600",
-    },
-};
 
 function BatchRow({ batch }: { batch: Batch }) {
     const progress = useMemo(() => {
@@ -31,7 +13,7 @@ function BatchRow({ batch }: { batch: Batch }) {
         return Math.round((batch.completedCount / batch.totalCount) * 100);
     }, [batch.completedCount, batch.totalCount]);
 
-    const status = statusConfig[batch.status];
+    const status = batchStatusConfig[batch.status];
 
     const router = useRouter();
 
