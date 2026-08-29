@@ -15,6 +15,13 @@ export class NotFoundError extends AppError {
     }
 }
 
+export class BadRequestError extends AppError {
+    constructor(message = "Bad Request") {
+        super(400, message);
+        this.name = "Bad Request Error";
+    }
+}
+
 export class ConflictError extends AppError {
     constructor(message = "Conflict") {
         super(409, message);

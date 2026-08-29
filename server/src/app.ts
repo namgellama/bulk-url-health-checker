@@ -13,6 +13,7 @@ import {
 import dbPlugin from "./plugins/db.plugin";
 import batchRoutes from "./routes/batch.route";
 import { AppError } from "./utils/error";
+import multipart from "@fastify/multipart";
 
 const app = fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
@@ -22,6 +23,7 @@ app.register(cors, {
 });
 app.register(helmet);
 app.register(dbPlugin);
+app.register(multipart);
 
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
