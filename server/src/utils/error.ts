@@ -21,3 +21,14 @@ export class ConflictError extends AppError {
         this.name = "Conflict Error";
     }
 }
+
+export class HttpStatusError extends Error {
+    constructor(
+        public httpStatus: number,
+        public responseTimeMs: number,
+        public pageTitle: string | null,
+        public statusText: string,
+    ) {
+        super(`HTTP ${httpStatus} - ${statusText}`);
+    }
+}

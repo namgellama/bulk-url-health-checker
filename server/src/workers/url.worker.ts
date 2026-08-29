@@ -1,8 +1,9 @@
 import { Job, Worker } from "bullmq";
-import { redis } from "../utils/redis";
-import { prisma } from "../utils/prisma";
-import { checkUrl } from "../utils/url-checker";
 import { publishBatchEvent } from "../pub-sub/publisher";
+import { HttpStatusError } from "../utils/error";
+import { prisma } from "../utils/prisma";
+import { redis } from "../utils/redis";
+import { checkUrl } from "../utils/url-checker";
 
 const worker = new Worker("url-queue", processUrl, {
     connection: redis,
@@ -45,15 +46,29 @@ export async function processUrl(job: Job) {
         // just records the interim failure info; final DB status is "failed"
         // only if this was the last attempt.
         const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 3);
+
         if (isLastAttempt) {
+            const httpStatus =
+                err instanceof HttpStatusError ? err.httpStatus : null;
+            const responseTimeMs =
+                err instanceof HttpStatusError ? err.responseTimeMs : 0;
+            const pageTitle =
+                err instanceof HttpStatusError ? err.pageTitle : null;
+            const statusText =
+                err instanceof HttpStatusError
+                    ? err.statusText
+                    : err instanceof Error
+                      ? err.message
+                      : "Unknown Error";
+
             await writeResult(urlId, batchId, jobVersion, "failed", {
-                httpStatus: null,
-                responseTimeMs: 0,
-                pageTitle: null,
-                errorMessage:
-                    err instanceof Error ? err.message : "Unknown error",
+                httpStatus,
+                responseTimeMs,
+                pageTitle,
+                errorMessage: statusText,
             });
         }
+
         throw err; // rethrow so BullMQ still counts/logs the attempt
     }
 }
