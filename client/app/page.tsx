@@ -1,3 +1,9 @@
+import BatchList from "@/components/BatchList";
+
 export default function Home() {
-    return <div>Hello World</div>;
+    return (
+        <div>
+            <BatchList />
+        </div>
+    );
 }
