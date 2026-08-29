@@ -8,6 +8,10 @@ import { checkUrl } from "../utils/url-checker";
 const worker = new Worker("url-queue", processUrl, {
     connection: redis,
     concurrency: 5,
+    limiter: {
+        max: 10,
+        duration: 1000,
+    },
 });
 
 worker.on("completed", (job) => {
