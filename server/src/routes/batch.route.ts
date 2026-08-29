@@ -21,6 +21,7 @@ const batchRoutes = async (
         { schema: { body: createBatchSchema } },
         controller.createBatch,
     );
+    app.post("/upload-csv", controller.createBatchFromCsv);
     app.get("/:id/events", controller.getBatchEvents);
 };
 

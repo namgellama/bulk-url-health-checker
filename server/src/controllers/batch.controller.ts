@@ -2,6 +2,8 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { subscribeClientToBatch } from "../pub-sub/subscriber";
 import type { BatchService } from "../services/batch.service";
 import type { CreateBatchInput } from "../validations/batch.validation";
+import { BadRequestError } from "../utils/error";
+import { parseCsvUrls } from "../utils/csv-parser";
 
 export function batchController(batchService: BatchService) {
     return {
@@ -41,7 +43,30 @@ export function batchController(batchService: BatchService) {
             });
         },
 
-        getBatchEvents: (
+        createBatchFromCsv: async (
+            req: FastifyRequest,
+            reply: FastifyReply,
+        ) => {
+            const file = await req.file();
+
+            if (!file) {
+                throw new BadRequestError("CSV file is required");
+            }
+
+            const csvText = await file.toBuffer();
+
+            const urls = parseCsvUrls(csvText.toString());
+
+            const batch = await batchService.create({ urls });
+
+            return reply.status(201).send({
+                success: true,
+                message: "Batch created successfully",
+                data: batch,
+            });
+        },
+
+        getBatchEvents: async (
             req: FastifyRequest<{ Params: { id: string } }>,
             reply: FastifyReply,
         ) => {
@@ -56,12 +81,21 @@ export function batchController(batchService: BatchService) {
                 "X-Accel-Buffering": "no",
             });
 
+            res.write("retry: 3000\n\n");
             res.write(": connected\n\n");
 
             const unsubscribe = subscribeClientToBatch(req.params.id, res);
 
+            const batch = await batchService.getById(req.params.id);
+
+            res.write(
+                `event: snapshot\n` + `data: ${JSON.stringify(batch)}\n\n`,
+            );
+
             const heartbeat = setInterval(() => {
-                res.write(": heartbeat\n\n");
+                if (!res.writableEnded) {
+                    res.write(": heartbeat\n\n");
+                }
             }, 15_000);
 
             req.raw.on("close", () => {

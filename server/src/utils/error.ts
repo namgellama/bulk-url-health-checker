@@ -15,9 +15,27 @@ export class NotFoundError extends AppError {
     }
 }
 
+export class BadRequestError extends AppError {
+    constructor(message = "Bad Request") {
+        super(400, message);
+        this.name = "Bad Request Error";
+    }
+}
+
 export class ConflictError extends AppError {
     constructor(message = "Conflict") {
         super(409, message);
         this.name = "Conflict Error";
+    }
+}
+
+export class HttpStatusError extends Error {
+    constructor(
+        public httpStatus: number,
+        public responseTimeMs: number,
+        public pageTitle: string | null,
+        public statusText: string,
+    ) {
+        super(`HTTP ${httpStatus} - ${statusText}`);
     }
 }

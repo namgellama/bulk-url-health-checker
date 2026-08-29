@@ -1,6 +1,11 @@
 import { urlQueue } from "../queues/url.queue";
 import { type BatchRepository } from "../repositories/batch.repository";
 import type { UrlRepository } from "../repositories/url.repository";
+import {
+    getCachedBatches,
+    invalidateBatchListCache,
+    setCachedBatches,
+} from "../utils/batch-cache";
 import { NotFoundError } from "../utils/error";
 import type { CreateBatchInput } from "../validations/batch.validation";
 
@@ -9,8 +14,18 @@ export function batchService(
     urlRepository: UrlRepository,
 ) {
     return {
-        getAll: () => {
-            return batchRepository.getAll();
+        getAll: async () => {
+            const cached = await getCachedBatches();
+
+            if (cached) {
+                return cached;
+            }
+
+            const batches = await batchRepository.getAll();
+
+            await setCachedBatches(batches);
+
+            return batches;
         },
 
         getById: async (id: string) => {
@@ -48,6 +63,8 @@ export function batchService(
             await urlRepository.updateBulkJobIds(
                 jobsWithIds.map(({ url, jobId }) => ({ id: url.id, jobId })),
             );
+
+            await invalidateBatchListCache();
 
             return batch;
         },

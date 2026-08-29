@@ -1,3 +1,5 @@
+import { HttpStatusError } from "./error";
+
 export interface CheckResult {
     httpStatus: number | null;
     responseTimeMs: number;
@@ -29,16 +31,24 @@ export async function checkUrl(url: string): Promise<CheckResult> {
             pageTitle = match?.[1]?.trim() ?? null;
         }
 
+        if (!res.ok) {
+            console.log("res", res);
+            // 4xx/5xx — reached the server, but it's not a healthy response.
+            // Throw so processUrl records it as "failed" with the real status.
+            throw new HttpStatusError(
+                res.status,
+                responseTimeMs,
+                pageTitle,
+                res.statusText,
+            );
+        }
+
         return {
             httpStatus: res.status,
             responseTimeMs,
             pageTitle,
             errorMessage: null,
         };
-    } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        // Throw so BullMQ's own retry/backoff kicks in — don't swallow it here
-        throw new Error(message);
     } finally {
         clearTimeout(timeout);
     }
