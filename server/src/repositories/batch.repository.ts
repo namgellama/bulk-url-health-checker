@@ -8,7 +8,10 @@ export function batchRepository(prisma: PrismaClient) {
         },
 
         getById: (id: string) => {
-            return prisma.batch.findUnique({ where: { id } });
+            return prisma.batch.findUnique({
+                where: { id },
+                include: { urls: true },
+            });
         },
 
         create: (body: CreateBatchInput) => {
