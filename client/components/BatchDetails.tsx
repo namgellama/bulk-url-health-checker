@@ -1,11 +1,9 @@
 import { batchStatusConfig } from "@/app/constants/batchStatusConfig";
-import { urlStatusConfig } from "@/app/constants/urlStatusConfig";
 import { Batch } from "@/types/batch";
 import { Url } from "@/types/url";
 import { formatDate } from "@/utils/formatDate";
-import { formatResponseTime } from "@/utils/formatResponseTime";
-import { getHostname } from "@/utils/getHostName";
 import Link from "next/link";
+import UrlRow from "./UrlRow";
 
 function BatchDetails({ batch }: { batch: Batch & { urls: Url[] } }) {
     const progress =
@@ -20,7 +18,7 @@ function BatchDetails({ batch }: { batch: Batch & { urls: Url[] } }) {
             <div className="mx-auto max-w-7xl">
                 {/* Back */}
                 <Link
-                    href="/batches"
+                    href="/"
                     className="mb-6 inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900"
                 >
                     ← Back to batches
@@ -184,15 +182,14 @@ function BatchDetails({ batch }: { batch: Batch & { urls: Url[] } }) {
                                     <th className="px-6 py-3">Page Title</th>
 
                                     <th className="px-6 py-3">Finished</th>
+
+                                    <th className="px-6 py-3" />
                                 </tr>
                             </thead>
 
                             <tbody className="divide-y divide-gray-100">
-                                {batch.urls.map((urlCheck) => (
-                                    <UrlRow
-                                        key={urlCheck.id}
-                                        urlCheck={urlCheck}
-                                    />
+                                {batch.urls.map((url) => (
+                                    <UrlRow key={url.id} url={url} />
                                 ))}
                             </tbody>
                         </table>
@@ -204,101 +201,6 @@ function BatchDetails({ batch }: { batch: Batch & { urls: Url[] } }) {
 }
 
 export default BatchDetails;
-
-function UrlRow({ urlCheck }: { urlCheck: Url }) {
-    const status = urlStatusConfig[urlCheck.status];
-
-    return (
-        <tr className="transition hover:bg-gray-50">
-            {/* URL */}
-            <td className="max-w-75 px-6 py-5">
-                <a
-                    href={urlCheck.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block truncate font-medium text-gray-900 hover:text-blue-600 hover:underline"
-                    title={urlCheck.url}
-                >
-                    {getHostname(urlCheck.url)}
-                </a>
-
-                <p
-                    className="mt-1 truncate text-xs text-gray-400"
-                    title={urlCheck.url}
-                >
-                    {urlCheck.url}
-                </p>
-            </td>
-
-            {/* Status */}
-            <td className="px-6 py-5">
-                <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}
-                >
-                    {urlCheck.status === "checked" && (
-                        <span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-                    )}
-
-                    {status.label}
-                </span>
-            </td>
-
-            {/* HTTP Status */}
-            <td className="px-6 py-5">
-                {urlCheck.httpStatus ? (
-                    <span
-                        className={
-                            urlCheck.httpStatus >= 200 &&
-                            urlCheck.httpStatus < 300
-                                ? "font-medium text-green-600"
-                                : "font-medium text-red-600"
-                        }
-                    >
-                        {urlCheck.httpStatus}
-                    </span>
-                ) : (
-                    <span className="text-gray-400">—</span>
-                )}
-            </td>
-
-            {/* Response Time */}
-            <td className="px-6 py-5 text-sm text-gray-600">
-                {formatResponseTime(urlCheck.responseTimeMs)}
-            </td>
-
-            {/* Attempts */}
-            <td className="px-6 py-5 text-sm text-gray-600">
-                {urlCheck.attemptCount} / {urlCheck.maxAttempts}
-            </td>
-
-            {/* Page Title */}
-            <td className="max-w-62.5 px-6 py-5">
-                {urlCheck.pageTitle ? (
-                    <p
-                        className="truncate text-sm text-gray-700"
-                        title={urlCheck.pageTitle}
-                    >
-                        {urlCheck.pageTitle}
-                    </p>
-                ) : urlCheck.errorMessage ? (
-                    <p
-                        className="truncate text-sm text-red-500"
-                        title={urlCheck.errorMessage}
-                    >
-                        {urlCheck.errorMessage}
-                    </p>
-                ) : (
-                    <span className="text-gray-400">—</span>
-                )}
-            </td>
-
-            {/* Finished */}
-            <td className="whitespace-nowrap px-6 py-5 text-sm text-gray-500">
-                {urlCheck.finishedAt ? formatDate(urlCheck.finishedAt) : "—"}
-            </td>
-        </tr>
-    );
-}
 
 function StatCard({
     label,
