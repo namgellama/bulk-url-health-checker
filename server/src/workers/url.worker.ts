@@ -97,7 +97,8 @@ async function writeResult(
         // flip batch to "completed" once every url is done
         if (
             batch.completedCount >= batch.totalCount &&
-            batch.status === "running"
+            batch.status !== "completed" &&
+            batch.status !== "cancelled"
         ) {
             await tx.batch.update({
                 where: { id: batchId },
