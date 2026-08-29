@@ -66,7 +66,7 @@ export function batchController(batchService: BatchService) {
             });
         },
 
-        getBatchEvents: (
+        getBatchEvents: async (
             req: FastifyRequest<{ Params: { id: string } }>,
             reply: FastifyReply,
         ) => {
@@ -81,12 +81,21 @@ export function batchController(batchService: BatchService) {
                 "X-Accel-Buffering": "no",
             });
 
+            res.write("retry: 3000\n\n");
             res.write(": connected\n\n");
 
             const unsubscribe = subscribeClientToBatch(req.params.id, res);
 
+            const batch = await batchService.getById(req.params.id);
+
+            res.write(
+                `event: snapshot\n` + `data: ${JSON.stringify(batch)}\n\n`,
+            );
+
             const heartbeat = setInterval(() => {
-                res.write(": heartbeat\n\n");
+                if (!res.writableEnded) {
+                    res.write(": heartbeat\n\n");
+                }
             }, 15_000);
 
             req.raw.on("close", () => {
