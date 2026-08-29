@@ -4,6 +4,7 @@ import { HttpStatusError } from "../utils/error";
 import { prisma } from "../utils/prisma";
 import { redis } from "../utils/redis";
 import { checkUrl } from "../utils/url-checker";
+import { invalidateBatchListCache } from "../utils/batch-cache";
 
 const worker = new Worker("url-queue", processUrl, {
     connection: redis,
@@ -128,14 +129,18 @@ async function writeResult(
         return batch;
     });
 
-    if (outcome) {
-        await publishBatchEvent(batchId, {
-            type: "url_updated",
-            urlId,
-            status,
-            httpStatus: result.httpStatus,
-            responseTimeMs: result.responseTimeMs,
-            pageTitle: result.pageTitle,
-        });
+    if (!outcome) {
+        return;
     }
+
+    await invalidateBatchListCache();
+
+    await publishBatchEvent(batchId, {
+        type: "url_updated",
+        urlId,
+        status,
+        httpStatus: result.httpStatus,
+        responseTimeMs: result.responseTimeMs,
+        pageTitle: result.pageTitle,
+    });
 }
