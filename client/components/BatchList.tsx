@@ -1,10 +1,12 @@
 "use client";
 
 import { useFetchAllBatches } from "@/apis/batch.api";
+import { useRouter } from "next/navigation";
 import BatchRow from "./BatchRow";
 
 export default function BatchList() {
     const { batches = [], isLoading, error } = useFetchAllBatches();
+    const router = useRouter();
 
     if (isLoading) {
         return <LoadingState />;
@@ -29,7 +31,10 @@ export default function BatchList() {
                         </p>
                     </div>
 
-                    <button className="rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800">
+                    <button
+                        className="rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+                        onClick={() => router.push("/batches/new")}
+                    >
                         + New Batch
                     </button>
                 </div>
@@ -124,6 +129,8 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 }
 
 function EmptyState() {
+    const router = useRouter();
+
     return (
         <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-xl">
@@ -137,7 +144,10 @@ function EmptyState() {
                 URLs at once.
             </p>
 
-            <button className="mt-5 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800">
+            <button
+                className="mt-5 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+                onClick={() => router.push("/batches/new")}
+            >
                 Create Batch
             </button>
         </div>

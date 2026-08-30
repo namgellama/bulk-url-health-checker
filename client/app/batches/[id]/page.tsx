@@ -2,15 +2,28 @@
 
 import { useFetchBatch } from "@/apis/batch.api";
 import BatchDetails from "@/components/BatchDetails";
+import { useBatchEvents } from "@/hooks/useBatchEvents";
+import { Batch } from "@/types/batch";
+import { Url } from "@/types/url";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const page = () => {
     const params = useParams<{ id: string }>();
+    const [batch, setBatch] = useState<(Batch & { urls: Url[] }) | null>(null);
 
-    const { batch, isLoading, error } = useFetchBatch(params.id);
+    const { batch: batchData, isLoading, error } = useFetchBatch(params.id);
 
-    if (isLoading) {
+    useEffect(() => {
+        if (batchData) {
+            setBatch(batchData);
+        }
+    }, [batchData]);
+
+    useBatchEvents(params.id, setBatch);
+
+    if (isLoading && !batch) {
         return <LoadingState />;
     }
 
