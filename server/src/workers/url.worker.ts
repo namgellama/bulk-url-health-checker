@@ -26,7 +26,7 @@ worker.on("failed", (job, error) => {
 export async function processUrl(job: Job) {
     const { urlId, batchId, jobVersion } = job.data;
 
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    // await new Promise((resolve) => setTimeout(resolve, 10000));
 
     // Re-check current state before doing any work — if the batch was
     // cancelled or this URL was re-queued (retry-failed bumped the version)

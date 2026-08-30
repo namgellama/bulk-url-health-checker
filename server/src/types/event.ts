@@ -2,7 +2,7 @@ export type BatchEvent =
     | {
           type: "url_updated";
           urlId: string;
-          status: "checking" | "success" | "failed" | "cancelled";
+          status: "queued" | "checking" | "success" | "failed" | "cancelled";
           httpStatus?: number | null;
           responseTimeMs?: number | null;
           pageTitle?: string | null;

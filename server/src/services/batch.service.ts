@@ -111,6 +111,75 @@ export function batchService(
 
             return result.batch;
         },
+
+        retryFailed: async (id: string) => {
+            const result = await batchRepository.retryFailed(id);
+
+            if (!result) {
+                throw new NotFoundError("Batch not found");
+            }
+
+            /*
+             * Create new BullMQ jobs ONLY for the failed URLs.
+             */
+            const jobs = result.urls.map((url) => ({
+                name: "check-url",
+                data: {
+                    urlId: url.id,
+                    batchId: result.batch.id,
+                    jobVersion: url.jobVersion,
+                },
+                opts: {
+                    attempts: 3,
+                    backoff: {
+                        type: "exponential",
+                        delay: 1000,
+                    },
+                },
+            }));
+
+            const createdJobs = await urlQueue.addBulk(jobs);
+
+            /*
+             * Store the new BullMQ job IDs.
+             */
+            await batchRepository.updateRetryJobIds(
+                result.urls.map((url, index) => ({
+                    urlId: url.id,
+                    jobId: createdJobs[index]?.id || "",
+                    jobVersion: url.jobVersion,
+                })),
+            );
+
+            await invalidateBatchListCache();
+
+            /*
+             * Tell connected batch pages that these URLs
+             * are queued again.
+             */
+            for (const url of result.urls) {
+                await publishBatchEvent(result.batch.id, {
+                    type: "url_updated",
+                    urlId: url.id,
+                    status: "queued",
+                    httpStatus: null,
+                    responseTimeMs: null,
+                    pageTitle: null,
+                    finishedAt: null,
+                });
+            }
+
+            /*
+             * Tell the frontend that the batch is running again
+             * and counters have been reset appropriately.
+             */
+            await publishBatchEvent(result.batch.id, {
+                type: "batch_updated",
+                batch: result.batch,
+            });
+
+            return result.batch;
+        },
     };
 }
 

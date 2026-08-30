@@ -24,6 +24,7 @@ const batchRoutes = async (
     app.post("/upload-csv", controller.createBatchFromCsv);
     app.get("/:id/events", controller.getBatchEvents);
     app.post("/:id/cancel", controller.cancelBatch);
+    app.post("/:id/retry-failed", controller.retryFailed);
 };
 
 export default batchRoutes;
