@@ -70,6 +70,8 @@ export function batchController(batchService: BatchService) {
             req: FastifyRequest<{ Params: { id: string } }>,
             reply: FastifyReply,
         ) => {
+            const batch = await batchService.getById(req.params.id);
+
             const res = reply.raw;
 
             reply.hijack();
@@ -79,20 +81,22 @@ export function batchController(batchService: BatchService) {
                 "Cache-Control": "no-cache, no-transform",
                 Connection: "keep-alive",
                 "X-Accel-Buffering": "no",
+                "Access-Control-Allow-Origin": "http://localhost:3000",
             });
 
+            // Tell browser how long to wait before reconnecting.
             res.write("retry: 3000\n\n");
+            // Initial connection comment.
             res.write(": connected\n\n");
 
-            const unsubscribe = subscribeClientToBatch(req.params.id, res);
+            /* * Subscribe BEFORE sending the snapshot. */ const unsubscribe =
+                subscribeClientToBatch(req.params.id, res);
 
-            const batch = await batchService.getById(req.params.id);
-
-            res.write(
+            /* * Initial complete state. */ res.write(
                 `event: snapshot\n` + `data: ${JSON.stringify(batch)}\n\n`,
             );
 
-            const heartbeat = setInterval(() => {
+            /* * Keep connection alive. */ const heartbeat = setInterval(() => {
                 if (!res.writableEnded) {
                     res.write(": heartbeat\n\n");
                 }

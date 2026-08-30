@@ -21,11 +21,17 @@ subscriber.on("message", (channel: string, message: string) => {
 
     if (!clients || clients.size === 0) return;
 
-    const event: BatchEvent = JSON.parse(message);
-    const payload = `data: ${JSON.stringify(event)}\n\n`;
-
-    for (const res of clients) {
-        res.write(payload);
+    try {
+        const event: BatchEvent = JSON.parse(message);
+        /* * IMPORTANT: * * Without "event: ..." * * SSE treats this as: * * message * * With this: * * event: url_updated * data: {...} * * the browser fires: * * eventSource.addEventListener("url_updated", ...) */ const payload =
+            `event: ${event.type}\n` + `data: ${JSON.stringify(event)}\n\n`;
+        for (const res of clients) {
+            if (!res.writableEnded) {
+                res.write(payload);
+            }
+        }
+    } catch (error) {
+        console.error("Failed to process batch SSE event:", error);
     }
 });
 
@@ -41,20 +47,25 @@ export function subscribeClientToBatch(
 
     clientsByBatch.get(batchId)!.add(res);
 
-    if (!subscribedChannels.has(channel)) {
+    /* * Only subscribe to Redis once per channel * on this API instance. */ if (
+        !subscribedChannels.has(channel)
+    ) {
         subscribedChannels.add(channel);
-        subscriber.subscribe(channel);
+        subscriber.subscribe(channel).catch((error) => {
+            console.error(`Failed to subscribe to ${channel}:`, error);
+        });
     }
 
-    return () => {
+    /* * Cleanup when browser disconnects. */ return () => {
         const clients = clientsByBatch.get(batchId);
         if (!clients) return;
-
         clients.delete(res);
         if (clients.size === 0) {
             clientsByBatch.delete(batchId);
             subscribedChannels.delete(channel);
-            subscriber.unsubscribe(channel);
+            subscriber.unsubscribe(channel).catch((error) => {
+                console.error(`Failed to unsubscribe from ${channel}:`, error);
+            });
         }
     };
 }

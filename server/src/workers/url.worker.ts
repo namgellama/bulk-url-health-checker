@@ -26,39 +26,94 @@ worker.on("failed", (job, error) => {
 export async function processUrl(job: Job) {
     const { urlId, batchId, jobVersion } = job.data;
 
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
     // Re-check current state before doing any work — if the batch was
     // cancelled or this URL was re-queued (retry-failed bumped the version)
     // while this job sat in the queue, bail out without hitting the network.
     const row = await prisma.url.findUnique({ where: { id: urlId } });
+
     if (!row || row.jobVersion !== jobVersion || row.status === "cancelled") {
         return; // stale job — no-op
     }
 
+    /*
+     * Mark batch as running.
+     *
+     * updateMany with status = pending makes this safe when
+     * multiple workers start at the same time.
+     */
+    const runningResult = await prisma.batch.updateMany({
+        where: {
+            id: batchId,
+            status: "pending",
+        },
+        data: {
+            status: "running",
+        },
+    });
+
+    /*
+     * Only the worker that actually changed pending -> running
+     * needs to publish the status event.
+     */
+    if (runningResult.count > 0) {
+        const batch = await prisma.batch.findUnique({
+            where: { id: batchId },
+            select: {
+                id: true,
+                status: true,
+                totalCount: true,
+                completedCount: true,
+                successCount: true,
+                failedCount: true,
+            },
+        });
+
+        if (batch) {
+            await publishBatchEvent(batchId, {
+                type: "batch_updated",
+                batch,
+            });
+        }
+
+        await invalidateBatchListCache();
+    }
+
+    /*
+     * Mark URL as checking.
+     */
     await prisma.url.updateMany({
-        where: { id: urlId, jobVersion },
+        where: {
+            id: urlId,
+            jobVersion,
+        },
         data: {
             status: "checking",
             startedAt: new Date(),
-            attemptCount: { increment: 1 },
+            attemptCount: {
+                increment: 1,
+            },
         },
     });
 
     try {
         const result = await checkUrl(row.url);
+
         await writeResult(urlId, batchId, jobVersion, "success", result);
     } catch (err) {
-        // BullMQ will retry automatically (attempts: 3, backoff). This catch
-        // just records the interim failure info; final DB status is "failed"
-        // only if this was the last attempt.
         const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 3);
 
         if (isLastAttempt) {
             const httpStatus =
                 err instanceof HttpStatusError ? err.httpStatus : null;
+
             const responseTimeMs =
                 err instanceof HttpStatusError ? err.responseTimeMs : 0;
+
             const pageTitle =
                 err instanceof HttpStatusError ? err.pageTitle : null;
+
             const statusText =
                 err instanceof HttpStatusError
                     ? err.statusText
@@ -74,7 +129,7 @@ export async function processUrl(job: Job) {
             });
         }
 
-        throw err; // rethrow so BullMQ still counts/logs the attempt
+        throw err;
     }
 }
 
@@ -91,6 +146,12 @@ async function writeResult(
     },
 ) {
     const outcome = await prisma.$transaction(async (tx) => {
+        /*
+         * Update URL.
+         *
+         * jobVersion prevents stale/retried jobs from
+         * modifying the URL.
+         */
         const { count } = await tx.url.updateMany({
             where: { id: urlId, jobVersion: expectedVersion }, // idempotency guard
             data: {
@@ -102,7 +163,32 @@ async function writeResult(
                 finishedAt: new Date(),
             },
         });
+
         if (count === 0) return null; // superseded — discard
+
+        /*
+         * Update batch counters.
+         */
+        const currentBatch = await tx.batch.findUnique({
+            where: { id: batchId },
+        });
+
+        if (!currentBatch) {
+            return null;
+        }
+
+        const completedCount = currentBatch.completedCount + 1;
+
+        /*
+         * The batch should already be running here.
+         *
+         * Only transition to completed when every URL
+         * has finished.
+         */
+        const newStatus =
+            completedCount >= currentBatch.totalCount
+                ? "completed"
+                : currentBatch.status;
 
         const batch = await tx.batch.update({
             where: { id: batchId },
@@ -111,20 +197,9 @@ async function writeResult(
                 ...(status === "success"
                     ? { successCount: { increment: 1 } }
                     : { failedCount: { increment: 1 } }),
+                status: newStatus,
             },
         });
-
-        // flip batch to "completed" once every url is done
-        if (
-            batch.completedCount >= batch.totalCount &&
-            batch.status !== "completed" &&
-            batch.status !== "cancelled"
-        ) {
-            await tx.batch.update({
-                where: { id: batchId },
-                data: { status: "completed" },
-            });
-        }
 
         return batch;
     });
@@ -135,6 +210,9 @@ async function writeResult(
 
     await invalidateBatchListCache();
 
+    /*
+     * URL event
+     */
     await publishBatchEvent(batchId, {
         type: "url_updated",
         urlId,
@@ -142,5 +220,13 @@ async function writeResult(
         httpStatus: result.httpStatus,
         responseTimeMs: result.responseTimeMs,
         pageTitle: result.pageTitle,
+    });
+
+    /*
+     * Batch event
+     */
+    await publishBatchEvent(batchId, {
+        type: "batch_updated",
+        batch: outcome,
     });
 }
