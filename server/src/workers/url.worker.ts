@@ -38,10 +38,27 @@ export async function processUrl(job: Job) {
     }
 
     /*
-     * Mark batch as running.
+     * Check batch before starting.
      *
-     * updateMany with status = pending makes this safe when
-     * multiple workers start at the same time.
+     * A job may have been queued before the batch was cancelled.
+     */
+    const batchBeforeStart = await prisma.batch.findUnique({
+        where: { id: batchId },
+        select: {
+            id: true,
+            status: true,
+        },
+    });
+
+    if (!batchBeforeStart || batchBeforeStart.status === "cancelled") {
+        return;
+    }
+
+    /*
+     * pending -> running
+     *
+     * updateMany makes this safe when multiple workers start
+     * at the same time.
      */
     const runningResult = await prisma.batch.updateMany({
         where: {
@@ -81,12 +98,42 @@ export async function processUrl(job: Job) {
     }
 
     /*
+     * Check one more time before starting the URL request.
+     *
+     * This closes the race:
+     *
+     * worker checks batch
+     *       ↓
+     * user cancels batch
+     *       ↓
+     * worker should NOT start checkUrl()
+     */
+    const latestState = await prisma.url.findUnique({
+        where: { id: urlId },
+        select: {
+            status: true,
+            jobVersion: true,
+        },
+    });
+
+    if (
+        !latestState ||
+        latestState.jobVersion !== jobVersion ||
+        latestState.status === "cancelled"
+    ) {
+        return;
+    }
+
+    /*
      * Mark URL as checking.
      */
-    await prisma.url.updateMany({
+    const checkingResult = await prisma.url.updateMany({
         where: {
             id: urlId,
             jobVersion,
+            status: {
+                not: "cancelled",
+            },
         },
         data: {
             status: "checking",
@@ -96,6 +143,10 @@ export async function processUrl(job: Job) {
             },
         },
     });
+
+    if (checkingResult.count === 0) {
+        return;
+    }
 
     try {
         const result = await checkUrl(row.url);
@@ -147,13 +198,20 @@ async function writeResult(
 ) {
     const outcome = await prisma.$transaction(async (tx) => {
         /*
-         * Update URL.
+         * Only a URL that is currently being checked can finish.
          *
-         * jobVersion prevents stale/retried jobs from
-         * modifying the URL.
+         * This prevents:
+         * - cancelled -> success
+         * - success -> success
+         * - failed -> success
+         * - stale jobs from updating the URL
          */
-        const { count } = await tx.url.updateMany({
-            where: { id: urlId, jobVersion: expectedVersion }, // idempotency guard
+        const { count: urlUpdated } = await tx.url.updateMany({
+            where: {
+                id: urlId,
+                jobVersion: expectedVersion,
+                status: "checking",
+            },
             data: {
                 status,
                 httpStatus: result.httpStatus,
@@ -164,54 +222,127 @@ async function writeResult(
             },
         });
 
-        if (count === 0) return null; // superseded — discard
+        /*
+         * URL was cancelled, already completed, or the job is stale.
+         *
+         * Do not update batch counters.
+         */
+        if (urlUpdated === 0) {
+            return null;
+        }
 
         /*
-         * Update batch counters.
+         * Get the current batch.
+         *
+         * A cancelled batch must never receive another completion.
          */
-        const currentBatch = await tx.batch.findUnique({
-            where: { id: batchId },
+        const currentBatch = await tx.batch.findFirst({
+            where: {
+                id: batchId,
+                status: {
+                    not: "cancelled",
+                },
+            },
+            select: {
+                id: true,
+                status: true,
+                totalCount: true,
+                completedCount: true,
+                successCount: true,
+                failedCount: true,
+            },
         });
 
+        /*
+         * The batch was cancelled while the URL was in flight.
+         *
+         * The URL update above happened in this transaction, so if the
+         * cancellation transaction won the race, this won't happen.
+         *
+         * If it does happen because of transaction ordering, rollback the
+         * entire transaction rather than leaving the URL updated without
+         * updating the batch.
+         */
         if (!currentBatch) {
             return null;
         }
 
         const completedCount = currentBatch.completedCount + 1;
 
-        /*
-         * The batch should already be running here.
-         *
-         * Only transition to completed when every URL
-         * has finished.
-         */
         const newStatus =
             completedCount >= currentBatch.totalCount
                 ? "completed"
                 : currentBatch.status;
 
-        const batch = await tx.batch.update({
-            where: { id: batchId },
+        /*
+         * Update the batch only while it is not cancelled.
+         */
+        const { count: batchUpdated } = await tx.batch.updateMany({
+            where: {
+                id: batchId,
+                status: {
+                    not: "cancelled",
+                },
+            },
             data: {
-                completedCount: { increment: 1 },
+                completedCount: {
+                    increment: 1,
+                },
+
                 ...(status === "success"
-                    ? { successCount: { increment: 1 } }
-                    : { failedCount: { increment: 1 } }),
+                    ? {
+                          successCount: {
+                              increment: 1,
+                          },
+                      }
+                    : {
+                          failedCount: {
+                              increment: 1,
+                          },
+                      }),
+
                 status: newStatus,
             },
         });
 
-        return batch;
+        /*
+         * Batch was cancelled before we could update it.
+         *
+         * Throwing rolls back the URL update as well.
+         */
+        if (batchUpdated === 0) {
+            throw new Error("Batch was cancelled while processing URL");
+        }
+
+        /*
+         * Return the complete batch state needed by the frontend.
+         */
+        return {
+            id: currentBatch.id,
+            status: newStatus,
+            totalCount: currentBatch.totalCount,
+            completedCount,
+            successCount:
+                currentBatch.successCount + (status === "success" ? 1 : 0),
+            failedCount:
+                currentBatch.failedCount + (status === "failed" ? 1 : 0),
+        };
     });
 
+    /*
+     * Nothing was changed because the job was stale/cancelled.
+     */
     if (!outcome) {
         return;
     }
 
+    /*
+     * Keep the batch list cache fresh.
+     */
     await invalidateBatchListCache();
 
     /*
-     * URL event
+     * Notify clients about the URL result.
      */
     await publishBatchEvent(batchId, {
         type: "url_updated",
@@ -220,10 +351,11 @@ async function writeResult(
         httpStatus: result.httpStatus,
         responseTimeMs: result.responseTimeMs,
         pageTitle: result.pageTitle,
+        finishedAt: new Date().toISOString(),
     });
 
     /*
-     * Batch event
+     * Notify clients about the updated batch counters/status.
      */
     await publishBatchEvent(batchId, {
         type: "batch_updated",

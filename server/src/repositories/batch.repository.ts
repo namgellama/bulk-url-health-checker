@@ -48,16 +48,49 @@ export function batchRepository(prisma: PrismaClient) {
                 }
 
                 if (batch.status === "cancelled") {
-                    return batch;
+                    return {
+                        batch,
+                        cancelledUrlIds: [],
+                    };
                 }
 
+                /*
+                 * Get URLs that are still active before cancelling them.
+                 * We need their IDs so the service can publish url_updated
+                 * SSE events for each cancelled URL.
+                 */
+                const activeUrls = await tx.url.findMany({
+                    where: {
+                        batchId: id,
+                        status: {
+                            in: ["queued", "checking"],
+                        },
+                    },
+                    select: {
+                        id: true,
+                    },
+                });
+
+                /*
+                 * Cancel the batch.
+                 */
                 const updatedBatch = await tx.batch.update({
-                    where: { id },
+                    where: {
+                        id,
+                        status: {
+                            not: "cancelled",
+                        },
+                    },
                     data: {
                         status: "cancelled",
                     },
                 });
 
+                /*
+                 * Cancel URLs that have not finished yet.
+                 *
+                 * Completed successful/failed URLs remain unchanged.
+                 */
                 await tx.url.updateMany({
                     where: {
                         batchId: id,
@@ -71,7 +104,10 @@ export function batchRepository(prisma: PrismaClient) {
                     },
                 });
 
-                return updatedBatch;
+                return {
+                    batch: updatedBatch,
+                    cancelledUrlIds: activeUrls.map((url) => url.id),
+                };
             });
         },
     };
