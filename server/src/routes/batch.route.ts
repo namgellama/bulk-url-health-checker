@@ -23,6 +23,7 @@ const batchRoutes = async (
     );
     app.post("/upload-csv", controller.createBatchFromCsv);
     app.get("/:id/events", controller.getBatchEvents);
+    app.post("/:id/cancel", controller.cancelBatch);
 };
 
 export default batchRoutes;

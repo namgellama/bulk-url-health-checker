@@ -1,3 +1,4 @@
+import { publishBatchEvent } from "../pub-sub/publisher";
 import { urlQueue } from "../queues/url.queue";
 import { type BatchRepository } from "../repositories/batch.repository";
 import type { UrlRepository } from "../repositories/url.repository";
@@ -65,6 +66,30 @@ export function batchService(
             );
 
             await invalidateBatchListCache();
+
+            return batch;
+        },
+
+        cancel: async (id: string) => {
+            const batch = await batchRepository.cancel(id);
+
+            if (!batch) {
+                throw new NotFoundError("Batch not found");
+            }
+
+            await invalidateBatchListCache();
+
+            await publishBatchEvent(id, {
+                type: "batch_updated",
+                batch: {
+                    id: batch.id,
+                    status: batch.status,
+                    totalCount: batch.totalCount,
+                    completedCount: batch.completedCount,
+                    successCount: batch.successCount,
+                    failedCount: batch.failedCount,
+                },
+            });
 
             return batch;
         },

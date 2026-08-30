@@ -107,5 +107,18 @@ export function batchController(batchService: BatchService) {
                 unsubscribe();
             });
         },
+
+        cancelBatch: async (
+            req: FastifyRequest<{ Params: { id: string } }>,
+            reply: FastifyReply,
+        ) => {
+            const batch = await batchService.cancel(req.params.id);
+
+            return reply.status(200).send({
+                success: true,
+                message: "Batch cancelled successfully",
+                data: batch,
+            });
+        },
     };
 }
