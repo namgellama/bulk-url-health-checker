@@ -120,5 +120,18 @@ export function batchController(batchService: BatchService) {
                 data: batch,
             });
         },
+
+        retryFailed: async (
+            req: FastifyRequest<{ Params: { id: string } }>,
+            reply: FastifyReply,
+        ) => {
+            const batch = await batchService.retryFailed(req.params.id);
+
+            return reply.status(200).send({
+                success: true,
+                message: "Failed URLs queued for retry",
+                data: batch,
+            });
+        },
     };
 }
