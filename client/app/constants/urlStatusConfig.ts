@@ -11,7 +11,7 @@ export const urlStatusConfig: Record<
         label: "Queued",
         className: "bg-gray-100 text-gray-600",
     },
-    checked: {
+    checking: {
         label: "Checking",
         className: "bg-blue-100 text-blue-700",
     },

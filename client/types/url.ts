@@ -1,6 +1,6 @@
 export type UrlStatus =
     | "queued"
-    | "checked"
+    | "checking"
     | "success"
     | "failed"
     | "cancelled";
