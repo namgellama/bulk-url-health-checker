@@ -31,21 +31,11 @@ const page = () => {
             return;
         }
 
-        try {
-            const result = await uploadCsvMutation(file);
-
-            router.push(`/batches/${result.id}`);
-        } catch (error: any) {
-            setError(
-                error?.response?.data?.message || "Failed to upload CSV file.",
-            );
-        } finally {
-            // Allow selecting the same file again.
-            e.target.value = "";
-        }
+        await uploadCsvMutation(file);
+        e.target.value = "";
     }
 
-    function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
+    async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
         e.preventDefault();
 
         setError("");
@@ -65,7 +55,7 @@ const page = () => {
                 const parsed = new URL(url);
 
                 return (
-                    parsed.protocol === "http:" || parsed.protocol === "https:"
+                    parsed.protocol !== "http:" && parsed.protocol !== "https:"
                 );
             } catch {
                 return true;
@@ -81,7 +71,7 @@ const page = () => {
             return;
         }
 
-        createBatchMutation({ urls: parsedUrls });
+        await createBatchMutation({ urls: parsedUrls });
     }
 
     return (

@@ -51,19 +51,16 @@ export const useCreateBatch = () => {
         return response.data.data;
     };
 
-    const { mutate: createBatchMutation, isPending: isLoading } = useMutation<
-        Batch,
-        ApiError,
-        { urls: string[] }
-    >({
-        mutationFn: fetchBatch,
-        onSuccess: (batch) => {
-            router.push(`/batches/${batch.id}`);
-        },
-        onError: (error) => {
-            handleErrorResponse(error, "Error creating batch");
-        },
-    });
+    const { mutateAsync: createBatchMutation, isPending: isLoading } =
+        useMutation<Batch, ApiError, { urls: string[] }>({
+            mutationFn: fetchBatch,
+            onSuccess: (batch) => {
+                router.push(`/batches/${batch.id}`);
+            },
+            onError: (error) => {
+                handleErrorResponse(error, "Error creating batch");
+            },
+        });
 
     return { createBatchMutation, isLoading };
 };
