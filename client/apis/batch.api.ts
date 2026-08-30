@@ -67,3 +67,28 @@ export const useCreateBatch = () => {
 
     return { createBatchMutation, isLoading };
 };
+
+export const useUploadCsv = () => {
+    const router = useRouter();
+
+    const uplaodCsv = async (file: File) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await api.post(`/v1/batches/upload-csv`, formData);
+        return response.data.data;
+    };
+
+    const { mutateAsync: uploadCsvMutation, isPending: isLoading } =
+        useMutation<Batch, ApiError, File>({
+            mutationFn: uplaodCsv,
+            onSuccess: (batch) => {
+                router.push(`/batches/${batch.id}`);
+            },
+            onError: (error) => {
+                handleErrorResponse(error, "Error upload csv");
+            },
+        });
+
+    return { uploadCsvMutation, isLoading };
+};
