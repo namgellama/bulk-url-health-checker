@@ -208,6 +208,11 @@ Then open:
 http://localhost:3000
 ```
 
+### Terminal 4 — BullMQ Worker
+
+cd server
+npm run worker
+
 ---
 
 # Architecture Overview
