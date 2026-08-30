@@ -89,3 +89,39 @@ export const useUploadCsv = () => {
 
     return { uploadCsvMutation, isLoading };
 };
+
+export const useCancelBatch = (id: string) => {
+    const cancelbatch = async () => {
+        const response = await api.post(`/v1/batches/${id}/cancel`);
+        return response.data.data;
+    };
+
+    const { mutateAsync: cancelBatchMutation, isPending: isLoading } =
+        useMutation<Batch, ApiError, void>({
+            mutationFn: cancelbatch,
+            onSuccess: (batch) => {},
+            onError: (error) => {
+                handleErrorResponse(error, "Error cancelling batch");
+            },
+        });
+
+    return { cancelBatchMutation, isLoading };
+};
+
+export const useRetryFailedBatch = (id: string) => {
+    const retryFailedBatch = async () => {
+        const response = await api.post(`/v1/batches/${id}/retry-failed`);
+        return response.data.data;
+    };
+
+    const { mutateAsync: retryFailedBatchMutation, isPending: isLoading } =
+        useMutation<Batch, ApiError, void>({
+            mutationFn: retryFailedBatch,
+            onSuccess: (batch) => {},
+            onError: (error) => {
+                handleErrorResponse(error, "Error retrying failed batch");
+            },
+        });
+
+    return { retryFailedBatchMutation, isLoading };
+};

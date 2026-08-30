@@ -4,6 +4,7 @@ import { Url } from "@/types/url";
 import { formatDate } from "@/utils/formatDate";
 import Link from "next/link";
 import UrlRow from "./UrlRow";
+import { useCancelBatch, useRetryFailedBatch } from "@/apis/batch.api";
 
 function BatchDetails({ batch }: { batch: Batch & { urls: Url[] } }) {
     const progress =
@@ -12,6 +13,28 @@ function BatchDetails({ batch }: { batch: Batch & { urls: Url[] } }) {
             : Math.round((batch.completedCount / batch.totalCount) * 100);
 
     const status = batchStatusConfig[batch.status];
+
+    const { cancelBatchMutation, isLoading: isCancelling } = useCancelBatch(
+        batch.id,
+    );
+
+    const { retryFailedBatchMutation, isLoading: isRetrying } =
+        useRetryFailedBatch(batch.id);
+
+    const isLoading = isCancelling || isRetrying;
+
+    const handleBatchCancel = async () => {
+        await cancelBatchMutation();
+    };
+
+    const handleRetryFailed = async () => {
+        await retryFailedBatchMutation();
+    };
+
+    const canRetry =
+        batch.failedCount > 0 &&
+        batch.status !== "running" &&
+        batch.status !== "cancelled";
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
@@ -48,11 +71,35 @@ function BatchDetails({ batch }: { batch: Batch & { urls: Url[] } }) {
                         </p>
                     </div>
 
-                    {batch.status === "running" && (
-                        <button className="rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">
-                            Cancel Batch
-                        </button>
-                    )}
+                    <div className="flex gap-3">
+                        {/* Retry Failed */}
+                        {canRetry && (
+                            <button
+                                type="button"
+                                onClick={handleRetryFailed}
+                                disabled={isLoading}
+                                className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isRetrying
+                                    ? "Retrying..."
+                                    : `Retry Failed (${batch.failedCount})`}
+                            </button>
+                        )}
+
+                        {/* Cancel */}
+                        {batch.status === "running" && (
+                            <button
+                                type="button"
+                                onClick={handleBatchCancel}
+                                disabled={isLoading}
+                                className="rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isCancelling
+                                    ? "Cancelling..."
+                                    : "Cancel Batch"}
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Progress */}
@@ -170,19 +217,12 @@ function BatchDetails({ batch }: { batch: Batch & { urls: Url[] } }) {
                             <thead className="border-b border-gray-200 bg-gray-50">
                                 <tr className="text-xs font-medium uppercase tracking-wide text-gray-500">
                                     <th className="px-6 py-3">URL</th>
-
                                     <th className="px-6 py-3">Status</th>
-
                                     <th className="px-6 py-3">HTTP</th>
-
                                     <th className="px-6 py-3">Response</th>
-
                                     <th className="px-6 py-3">Attempts</th>
-
                                     <th className="px-6 py-3">Page Title</th>
-
                                     <th className="px-6 py-3">Finished</th>
-
                                     <th className="px-6 py-3" />
                                 </tr>
                             </thead>
