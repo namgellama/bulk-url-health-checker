@@ -6,12 +6,19 @@ export type BatchEvent =
           httpStatus?: number | null;
           responseTimeMs?: number | null;
           pageTitle?: string | null;
+          finishedAt?: string | null;
       }
     | {
-          type: "batch_status_changed";
-          status: "pending" | "running" | "completed" | "cancelled";
+          type: "batch_updated";
+          batch: {
+              id: string;
+              status: "pending" | "running" | "completed" | "cancelled";
+              totalCount: number;
+              completedCount: number;
+              successCount: number;
+              failedCount: number;
+          };
       };
-
 export function batchChannel(batchId: string): string {
     return `batch:${batchId}:events`;
 }
